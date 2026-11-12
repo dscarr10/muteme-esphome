@@ -93,11 +93,6 @@ This uses the same Android call API that Android Auto and smartwatch apps use. T
    - Open it on the phone. You'll need to allow installs from your browser or file manager.
    - It needs Android 12 or newer.
 2. **Grant the call permission.** Open the app and tap **Grant call companion role**.
-   - If your phone doesn't offer it, turn on USB debugging and run the command the app shows, once, from a PC:
-
-     ```
-     adb shell cmd role add-role-holder android.app.role.CALL_COMPANION dev.mutemebridge.callcompanion
-     ```
 3. **Set up Home Assistant.** Use [`home-assistant/call-mute-example.yaml`](home-assistant/call-mute-example.yaml):
    - Create two toggle helpers.
    - Add a webhook automation with your own random webhook ID.
