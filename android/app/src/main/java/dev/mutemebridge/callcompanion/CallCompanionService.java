@@ -37,8 +37,8 @@ public class CallCompanionService extends InCallService {
     @Override
     public void onDestroy() {
         instance = null;
-        // The service is unbound when the last call ends; make sure HA sees "not in a call".
-        HaReporter.report(this, false, false, "", false);
+        // The service is unbound when the last call ends; make sure HA sees the current state.
+        CallState.publish(this, false);
         Log.i(TAG, "In-call service stopped");
         super.onDestroy();
     }
@@ -104,8 +104,7 @@ public class CallCompanionService extends InCallService {
     }
 
     void publish(boolean force) {
-        Call call = activeCall();
-        HaReporter.report(this, call != null, muted, appOf(call), force);
+        CallState.publish(this, force);
     }
 
     // ---- Used by CommandReceiver and the status screen ----

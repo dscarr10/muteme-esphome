@@ -45,6 +45,17 @@
             </intent-filter>
         </service>
 
+        <!-- Reads Teams' ongoing-call notification (Mute/Unmute button). Needs notification access. -->
+        <service
+            android:name=".TeamsNotificationListener"
+            android:exported="true"
+            android:label="MuteMe Call Companion"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- Commands from Home Assistant (companion app "command_broadcast_intent"). -->
         <receiver
             android:name=".CommandReceiver"

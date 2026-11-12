@@ -22,13 +22,13 @@ public class CommandReceiver extends BroadcastReceiver {
         boolean handled;
         switch (action) {
             case PREFIX + "TOGGLE_MUTE":
-                handled = CallCompanionService.toggleMute();
+                handled = CallState.toggleMute();
                 break;
             case PREFIX + "MUTE":
-                handled = CallCompanionService.setMute(true);
+                handled = CallState.setMute(true);
                 break;
             case PREFIX + "UNMUTE":
-                handled = CallCompanionService.setMute(false);
+                handled = CallState.setMute(false);
                 break;
             case PREFIX + "REPORT":
                 handled = false; // fall through to the resend below
@@ -40,12 +40,7 @@ public class CommandReceiver extends BroadcastReceiver {
 
         // No call (or a REPORT request): resend the current state so HA can resync.
         if (!handled) {
-            CallCompanionService s = CallCompanionService.instance;
-            if (s != null) {
-                s.publish(true);
-            } else {
-                HaReporter.report(context, false, false, "", true);
-            }
+            CallState.publish(context, true);
         }
     }
 }

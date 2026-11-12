@@ -2,13 +2,16 @@ package dev.mutemebridge.callcompanion;
 
 import android.app.Activity;
 import android.app.AppOpsManager;
+import android.app.NotificationManager;
 import android.app.role.RoleManager;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Process;
+import android.provider.Settings;
 import android.text.InputType;
 import android.util.TypedValue;
 import android.view.View;
@@ -40,6 +43,7 @@ public class MainActivity extends Activity {
     private TextView lastSentText;
     private EditText webhookInput;
     private TextView adbText;
+    private TextView notifText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,10 +55,17 @@ public class MainActivity extends Activity {
         root.setPadding(pad, pad, pad, pad);
 
         root.addView(heading("MuteMe Call Companion"));
-        root.addView(body("Lets Home Assistant see and change the mute state of calls on this phone "
-                + "(Teams and other calling apps that share their calls with Android)."));
+        root.addView(body("Lets Home Assistant see and change the mute state of calls on this phone. "
+                + "For Teams it reads and presses the Mute button on Teams' call notification."));
 
-        root.addView(heading("1. Call access"));
+        root.addView(heading("1. Notification access (Teams)"));
+        notifText = body("");
+        root.addView(notifText);
+        root.addView(button("Open notification access settings", v -> openNotificationAccess()));
+        root.addView(body("On Android 13+, if the switch is greyed out: open this app's App info, tap the "
+                + "⋮ menu, choose \"Allow restricted settings\", then try again."));
+
+        root.addView(heading("2. Call access (other calling apps, optional)"));
         roleText = body("");
         root.addView(roleText);
         Button roleButton = button("Grant call companion role", v -> requestRole());
@@ -66,7 +77,7 @@ public class MainActivity extends Activity {
         adbText.setTypeface(Typeface.MONOSPACE);
         root.addView(adbText);
 
-        root.addView(heading("2. Home Assistant webhook"));
+        root.addView(heading("3. Home Assistant webhook"));
         webhookInput = new EditText(this);
         webhookInput.setHint("https://…/api/webhook/muteme_call_companion");
         webhookInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
@@ -75,23 +86,18 @@ public class MainActivity extends Activity {
         root.addView(webhookInput);
         root.addView(button("Save and send a test", v -> {
             Prefs.setWebhookUrl(this, webhookInput.getText().toString());
-            CallCompanionService s = CallCompanionService.instance;
-            if (s != null) {
-                s.publish(true);
-            } else {
-                HaReporter.report(this, false, false, "", true);
-            }
+            CallState.publish(this, true);
             Toast.makeText(this, "Saved, sending…", Toast.LENGTH_SHORT).show();
         }));
         lastSentText = body("");
         root.addView(lastSentText);
 
-        root.addView(heading("3. Live status"));
+        root.addView(heading("4. Live status"));
         callText = body("");
         callText.setTextIsSelectable(true);
         root.addView(callText);
         root.addView(button("Toggle mute (test)", v -> {
-            if (!CallCompanionService.toggleMute()) {
+            if (!CallState.toggleMute()) {
                 Toast.makeText(this, "No active call visible", Toast.LENGTH_SHORT).show();
             }
         }));
@@ -120,12 +126,35 @@ public class MainActivity extends Activity {
                 : "Call access: NOT granted. The app can't see calls until it is.");
         adbText.setVisibility(held ? View.GONE : View.VISIBLE);
 
+        boolean notifOk = notificationAccessGranted();
+        notifText.setText(notifOk
+                ? "Notification access: granted"
+                : "Notification access: NOT granted. Needed to read and press Teams' mute button.");
+
         String calls = CallCompanionService.describeCalls();
         boolean bound = CallCompanionService.instance != null;
-        callText.setText("Calls seen:\n" + calls
-                + (bound ? "\nMuted: " + (CallCompanionService.isMutedNow() ? "yes" : "no") : ""));
+        callText.setText("Teams: " + TeamsNotificationListener.describe()
+                + "\n\nAndroid call system:\n" + calls
+                + (bound ? "\nSystem mute: " + (CallCompanionService.isMutedNow() ? "on" : "off") : ""));
 
         lastSentText.setText("Last send: " + Prefs.lastResult(this));
+    }
+
+    private boolean notificationAccessGranted() {
+        NotificationManager nm = getSystemService(NotificationManager.class);
+        return nm != null && nm.isNotificationListenerAccessGranted(
+                new ComponentName(this, TeamsNotificationListener.class));
+    }
+
+    private void openNotificationAccess() {
+        try {
+            Intent i = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS);
+            i.putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,
+                    new ComponentName(this, TeamsNotificationListener.class).flattenToString());
+            startActivity(i);
+        } catch (Exception e) {
+            startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
+        }
     }
 
     /** Either route gives Android a reason to bind CallCompanionService during calls. */
