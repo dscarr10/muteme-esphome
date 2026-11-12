@@ -20,6 +20,8 @@ import android.widget.Toast;
 /** Status and setup screen. The real work happens in CallCompanionService. */
 public class MainActivity extends Activity {
     private static final int REQ_ROLE = 1;
+    // Not exposed in the public SDK (it's a @SystemApi constant), so spell it out.
+    private static final String ROLE_CALL_COMPANION = "android.app.role.CALL_COMPANION";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable ticker = new Runnable() {
@@ -124,22 +126,22 @@ public class MainActivity extends Activity {
 
     private boolean roleHeld() {
         RoleManager rm = getSystemService(RoleManager.class);
-        return rm != null && rm.isRoleHeld(RoleManager.ROLE_CALL_COMPANION);
+        return rm != null && rm.isRoleHeld(ROLE_CALL_COMPANION);
     }
 
     private void requestRole() {
         RoleManager rm = getSystemService(RoleManager.class);
-        if (rm == null || !rm.isRoleAvailable(RoleManager.ROLE_CALL_COMPANION)) {
+        if (rm == null || !rm.isRoleAvailable(ROLE_CALL_COMPANION)) {
             Toast.makeText(this, "This phone doesn't offer the role here — use the adb command.",
                     Toast.LENGTH_LONG).show();
             return;
         }
-        if (rm.isRoleHeld(RoleManager.ROLE_CALL_COMPANION)) {
+        if (rm.isRoleHeld(ROLE_CALL_COMPANION)) {
             Toast.makeText(this, "Already granted", Toast.LENGTH_SHORT).show();
             return;
         }
         try {
-            startActivityForResult(rm.createRequestRoleIntent(RoleManager.ROLE_CALL_COMPANION), REQ_ROLE);
+            startActivityForResult(rm.createRequestRoleIntent(ROLE_CALL_COMPANION), REQ_ROLE);
         } catch (Exception e) {
             Toast.makeText(this, "Couldn't ask for the role — use the adb command.", Toast.LENGTH_LONG).show();
         }
