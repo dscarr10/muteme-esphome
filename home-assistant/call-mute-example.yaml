@@ -1,5 +1,6 @@
-# MuteMe as a real mute button for calls on your Android phone (Teams etc.)
-# Needs the MuteMe Call Companion app (android/ folder) on the phone.
+# MuteMe as a mute button for Microsoft Teams calls on your Android phone.
+# Needs the MuteMe Call Companion app (android/ folder) on the phone, with notification access.
+# Colours: solid green = muted (OK to talk to me), solid red = live on a call (stop).
 #
 # Before using:
 #  1. Create two toggle helpers (Settings → Devices & services → Helpers → Toggle):
@@ -26,7 +27,7 @@
         entity_id: input_boolean.phone_call_muted
   mode: queued
 
-# 2. MuteMe tap: during a call toggle mute; otherwise pause/resume the light
+# 2. MuteMe tap: during a call toggle Teams mute; otherwise pause/resume the light
 #    (replaces the plain "tap to pause" automation)
 - id: muteme_tap_pause_display
   alias: MuteMe → tap (mute during calls, otherwise pause light)
@@ -55,7 +56,7 @@
   mode: single
 
 # 3. In your MuteMe display automation (example 3 in automations-example.yaml),
-#    show the call state ahead of everything except quiet hours. Add this trigger:
+#    show the call state ahead of alerts and the pause (quiet hours still win). Add this trigger:
 #
 #      - trigger: state
 #        entity_id: [input_boolean.phone_call_active, input_boolean.phone_call_muted]
@@ -66,8 +67,8 @@
 #        {% if quiet %}
 #          {{ {'color': 'off', 'mode': 'solid'} }}
 #        {% elif is_state('input_boolean.phone_call_active', 'on') %}
-#          {{ {'color': 'red', 'mode': 'solid'} if is_state('input_boolean.phone_call_muted', 'on')
-#             else {'color': 'green', 'mode': 'solid'} }}
+#          {{ {'color': 'green', 'mode': 'solid'} if is_state('input_boolean.phone_call_muted', 'on')
+#             else {'color': 'red', 'mode': 'solid'} }}
 #        {% elif is_state('input_boolean.muteme_display_paused', 'on') %}
 #          {{ {'color': 'off', 'mode': 'solid'} }}
 #        {% else %}
