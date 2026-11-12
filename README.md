@@ -1,5 +1,7 @@
 # MuteMe → Home Assistant (ESPHome on an ESP32-S3)
 
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support%20this%20project-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/dscarr10)
+
 Turn a [MuteMe](https://muteme.com/) button into a Home Assistant status light and touch button — no MuteMe app, no computer.
 
 An ESP32-S3 acts as a **USB host**: the MuteMe plugs straight into the ESP32's USB port, and a custom ESPHome component talks to it over USB HID. In Home Assistant you get the button's touch events and full control of its LED.
