@@ -77,35 +77,43 @@ The port names are printed on the back of the board:
 
 Mine mirrors the same "most urgent household alert" that drives my Inovelli switch LED bars: red for urgent things like an open gate or a warm fridge, yellow for litter and feeder reminders, green or white on trash night.
 
-## Optional: real mute button for phone calls (Android)
+## Optional: mute button for Microsoft Teams calls (Android)
 
-The MuteMe was designed as a mute button. If you take calls (Teams, phone, etc.) on an Android phone, the **MuteMe Call Companion** app in [`android/`](android/) makes it one again:
+The MuteMe was designed as a mute button. If you take Teams calls on an Android phone, the **MuteMe Call Companion** app in [`android/`](android/) makes it one again:
 
-- The button shows **solid red when you're muted** and **solid green when you're on a call and unmuted**. It stays in sync however you mute: in the calling app, from the car, or from the button.
-- **During a call, tap the button to mute or unmute.** Outside a call, tap works as before.
+- **During a Teams call, tap the button to mute or unmute.** Teams' own mute button flips too.
+- **The light shows Teams' real mute state**, however you mute: in Teams, from its notification, or from the button.
+  - Solid **green**: muted, so it's OK to talk to me.
+  - Solid **red**: live on a call, so stop.
+- Outside a call, the button works as before.
 
-This uses the same Android call API that Android Auto and smartwatch apps use. The app holds Android's "call companion" role, sees the shared mute state of the active call, and can change it. Calling apps that hand their calls to Android (as Teams does for Android Auto) work; apps that don't won't show up.
+### How it talks to Teams
+
+Teams doesn't share its mute state with Android's call system. However, its ongoing-call notification has a **Mute / Unmute** button. The app uses Android's notification access to:
+- read that button's label, to know whether you're muted;
+- press it, to toggle mute.
+
+This depends on how Teams builds its notification, so a future Teams update could change it. The app also watches Android's call system for other calling apps, but Teams calls go through the notification.
 
 ### Setup
 
 1. **Install the app.**
-   - Download `muteme-call-companion.apk` from this repo's Releases page, or from the latest **Build Android call companion** run under Actions.
-   - Open it on the phone. You'll need to allow installs from your browser or file manager.
+   - Download `muteme-call-companion.apk` from this repo's [Releases](../../releases) page and open it on the phone. You'll need to allow installs from your browser or file manager.
    - It needs Android 12 or newer.
-2. **Grant the call permission.** Open the app and tap **Grant call companion role**.
+2. **Turn on notification access.** Open the app and tap **Open notification access settings**, then switch on MuteMe Call Companion.
+   - If the switch is greyed out, Android is blocking it because the app didn't come from the Play Store. Open the app's **App info**, tap the **⋮** menu, choose **Allow restricted settings**, and try again.
 3. **Set up Home Assistant.** Use [`home-assistant/call-mute-example.yaml`](home-assistant/call-mute-example.yaml):
    - Create two toggle helpers.
-   - Add a webhook automation with your own random webhook ID.
-   - Add the updated tap automation.
-   - Make the change to your display automation.
+   - Add the webhook automation, with your own random webhook ID.
+   - Replace the tap automation.
+   - Update your display automation's `look` template.
 4. **Connect the app.** Paste `https://<your-ha-address>/api/webhook/<your-webhook-id>` into the app and tap **Save and send a test**. "Last send" should say `sent (HTTP 200)`.
 5. **Test it.**
-   - Start a call. The app's **Live status** should list it, for example `com.microsoft.teams — active`.
-   - Mute it in the calling app and check that **Muted** changes and the MuteMe turns red.
-   - Tap the MuteMe and check that the call unmutes.
+   - Join a Teams meeting. The app's **Live status** should show `Teams call — unmuted`, and the MuteMe turns red.
+   - Tap the MuteMe. Teams should mute and the button should turn green.
 
 **Notes:**
-- The app has no background service. Android only runs it while a call is active, so it uses no battery between calls.
+- The app only reports when something changes, so it uses next to no battery.
 - Every build is signed with the same throwaway key, kept in the repo, so updates install over the old version. If you fork this, generate your own key.
 
 ## How it works
