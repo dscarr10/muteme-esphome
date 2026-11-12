@@ -2,11 +2,16 @@
 
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support%20this%20project-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/dscarr10)
 
-Turn a [MuteMe](https://muteme.com/) button into a Home Assistant status light and touch button — no MuteMe app, no computer.
+**Got a [MuteMe](https://muteme.com/) you can't use because of the app?** This turns it into a Home Assistant status light and a working Microsoft Teams mute button, with no MuteMe software and no computer.
 
-An ESP32-S3 acts as a **USB host**: the MuteMe plugs straight into the ESP32's USB port, and a custom ESPHome component talks to it over USB HID. In Home Assistant you get the button's touch events and full control of its LED.
+- **No app, no PC.** An ESP32-S3 talks to the MuteMe over USB, so it works even if your work PC can't install software.
+- **Home Assistant status light.** Show alerts, call status or anything else Home Assistant knows about, in 7 colours with dim and pulse effects.
+- **Teams mute from your phone (optional).** During a Teams call on Android, tap the button to mute or unmute. The light shows whether you're muted, however you muted.
+- **Local and simple.** It's an ESPHome device on your Wi-Fi with updates over the air, and the button's touches arrive in Home Assistant as events.
 
-I built this because my MuteMe was useless to me: it can't plug into a phone, and my work PC can't install the MuteMe software. Now it sits on my desk showing household alerts from Home Assistant.
+I built this because my MuteMe was useless to me: it can't plug into a phone, and my work PC can't install the MuteMe software. Now it sits on my desk showing household alerts and muting my Teams calls.
+
+How it works: the MuteMe plugs straight into the ESP32's USB port, and a custom ESPHome component talks to it over USB HID.
 
 <p align="center"><img src="images/setup-overview.jpg" alt="MuteMe plugged into an ESP32-S3 board, glowing" width="600"></p>
 
