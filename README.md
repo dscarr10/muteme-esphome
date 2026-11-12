@@ -6,7 +6,7 @@ An ESP32-S3 acts as a **USB host**: the MuteMe plugs straight into the ESP32's U
 
 I built this because my MuteMe was useless to me: it can't plug into a phone, and my work PC can't install the MuteMe software. Now it sits on my desk showing household alerts from Home Assistant.
 
-<p align="center"><img src="images/setup-overview.jpg" alt="MuteMe plugged into an ESP32-S3 board, glowing" width="420"></p>
+<p align="center"><img src="images/setup-overview.jpg" alt="MuteMe plugged into an ESP32-S3 board, glowing" width="600"></p>
 
 ## What you get in Home Assistant
 
