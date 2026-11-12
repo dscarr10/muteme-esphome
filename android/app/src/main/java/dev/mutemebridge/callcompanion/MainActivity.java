@@ -1,12 +1,14 @@
 package dev.mutemebridge.callcompanion;
 
 import android.app.Activity;
+import android.app.AppOpsManager;
 import android.app.role.RoleManager;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Process;
 import android.text.InputType;
 import android.util.TypedValue;
 import android.view.View;
@@ -22,6 +24,7 @@ public class MainActivity extends Activity {
     private static final int REQ_ROLE = 1;
     // Not exposed in the public SDK (it's a @SystemApi constant), so spell it out.
     private static final String ROLE_CALL_COMPANION = "android.app.role.CALL_COMPANION";
+    private static final String OP_MANAGE_ONGOING_CALLS = "android:manage_ongoing_calls";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable ticker = new Runnable() {
@@ -51,13 +54,14 @@ public class MainActivity extends Activity {
         root.addView(body("Lets Home Assistant see and change the mute state of calls on this phone "
                 + "(Teams and other calling apps that share their calls with Android)."));
 
-        root.addView(heading("1. Call permission"));
+        root.addView(heading("1. Call access"));
         roleText = body("");
         root.addView(roleText);
         Button roleButton = button("Grant call companion role", v -> requestRole());
         root.addView(roleButton);
-        adbText = body("If the button does nothing, grant it once from a PC with USB debugging on:\n"
-                + "adb shell cmd role add-role-holder android.app.role.CALL_COMPANION " + getPackageName());
+        adbText = body("If the button does nothing (many phones don't offer it), grant call access once "
+                + "from a PC with USB debugging on:\n"
+                + "adb shell appops set " + getPackageName() + " MANAGE_ONGOING_CALLS allow");
         adbText.setTextIsSelectable(true);
         adbText.setTypeface(Typeface.MONOSPACE);
         root.addView(adbText);
@@ -110,10 +114,10 @@ public class MainActivity extends Activity {
     }
 
     private void refresh() {
-        boolean held = roleHeld();
+        boolean held = hasCallAccess();
         roleText.setText(held
-                ? "Call companion role: granted"
-                : "Call companion role: NOT granted. The app can't see calls until it is.");
+                ? "Call access: granted"
+                : "Call access: NOT granted. The app can't see calls until it is.");
         adbText.setVisibility(held ? View.GONE : View.VISIBLE);
 
         String calls = CallCompanionService.describeCalls();
@@ -124,9 +128,27 @@ public class MainActivity extends Activity {
         lastSentText.setText("Last send: " + Prefs.lastResult(this));
     }
 
+    /** Either route gives Android a reason to bind CallCompanionService during calls. */
+    private boolean hasCallAccess() {
+        return roleHeld() || manageOngoingCallsAllowed();
+    }
+
     private boolean roleHeld() {
         RoleManager rm = getSystemService(RoleManager.class);
-        return rm != null && rm.isRoleHeld(ROLE_CALL_COMPANION);
+        return rm != null && rm.isRoleAvailable(ROLE_CALL_COMPANION) && rm.isRoleHeld(ROLE_CALL_COMPANION);
+    }
+
+    private boolean manageOngoingCallsAllowed() {
+        AppOpsManager ops = getSystemService(AppOpsManager.class);
+        if (ops == null) {
+            return false;
+        }
+        try {
+            return ops.unsafeCheckOpNoThrow(OP_MANAGE_ONGOING_CALLS, Process.myUid(), getPackageName())
+                    == AppOpsManager.MODE_ALLOWED;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void requestRole() {
@@ -152,7 +174,7 @@ public class MainActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_ROLE) {
             refresh();
-            if (!roleHeld()) {
+            if (!hasCallAccess()) {
                 Toast.makeText(this, "Not granted — use the adb command.", Toast.LENGTH_LONG).show();
             }
         }
