@@ -1,0 +1,46 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace = 'dev.mutemebridge.callcompanion'
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = 'dev.mutemebridge.callcompanion'
+        minSdk = 31        // Android 12
+        targetSdk = 35
+        versionCode = 1
+        versionName = '0.1.0'
+    }
+
+    // One fixed key for every build, so a new APK installs over the old one.
+    // It's a throwaway debug-style key: fine for sideloading, not for the Play Store.
+    signingConfigs {
+        shared {
+            storeFile = file('signing.keystore')
+            storePassword = 'android'
+            keyAlias = 'mutemecompanion'
+            keyPassword = 'android'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig = signingConfigs.shared
+        }
+        release {
+            minifyEnabled = false
+            signingConfig = signingConfigs.shared
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError = false
+    }
+}

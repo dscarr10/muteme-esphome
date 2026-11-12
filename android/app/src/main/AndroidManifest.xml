@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Cleartext is allowed so a local http://<ha-ip>:8123 webhook URL works. -->
+    <application
+        android:allowBackup="false"
+        android:label="MuteMe Call Companion"
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          Non-UI "call companion" InCallService. Android binds it during calls once the app
+          holds the call companion role. INCLUDE_SELF_MANAGED_CALLS lets it see VoIP calls
+          (Teams) whose app shares them with in-call services, as Android Auto relies on.
+        -->
+        <service
+            android:name=".CallCompanionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_INCALL_SERVICE">
+            <meta-data
+                android:name="android.telecom.INCLUDE_SELF_MANAGED_CALLS"
+                android:value="true" />
+            <intent-filter>
+                <action android:name="android.telecom.InCallService" />
+            </intent-filter>
+        </service>
+
+        <!-- Commands from Home Assistant (companion app "command_broadcast_intent"). -->
+        <receiver
+            android:name=".CommandReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="dev.mutemebridge.callcompanion.TOGGLE_MUTE" />
+                <action android:name="dev.mutemebridge.callcompanion.MUTE" />
+                <action android:name="dev.mutemebridge.callcompanion.UNMUTE" />
+                <action android:name="dev.mutemebridge.callcompanion.REPORT" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

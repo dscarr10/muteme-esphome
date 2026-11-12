@@ -1,0 +1,75 @@
+# MuteMe as a real mute button for calls on your Android phone (Teams etc.)
+# Needs the MuteMe Call Companion app (android/ folder) on the phone.
+#
+# Before using:
+#  1. Create two toggle helpers (Settings → Devices & services → Helpers → Toggle):
+#       "Phone call active"  → input_boolean.phone_call_active
+#       "Phone call muted"   → input_boolean.phone_call_muted
+#  2. Pick your own random webhook ID below and put the same URL in the phone app:
+#       https://<your-ha-address>/api/webhook/<webhook_id>
+#  3. Replace notify.mobile_app_YOUR_PHONE with your phone's notify action.
+
+# 1. Phone app → Home Assistant: keep the helpers in sync with the call
+- id: call_companion_webhook
+  alias: Call companion → call and mute state
+  triggers:
+    - trigger: webhook
+      webhook_id: muteme_call_CHANGE_ME          # make this long and random
+      allowed_methods: [POST]
+      local_only: false                          # false = works through Nabu Casa / remote URL
+  actions:
+    - action: "input_boolean.turn_{{ 'on' if trigger.json.in_call else 'off' }}"
+      target:
+        entity_id: input_boolean.phone_call_active
+    - action: "input_boolean.turn_{{ 'on' if trigger.json.muted else 'off' }}"
+      target:
+        entity_id: input_boolean.phone_call_muted
+  mode: queued
+
+# 2. MuteMe tap: during a call toggle mute; otherwise pause/resume the light
+#    (replaces the plain "tap to pause" automation)
+- id: muteme_tap_pause_display
+  alias: MuteMe → tap (mute during calls, otherwise pause light)
+  triggers:
+    - trigger: event
+      event_type: esphome.muteme_button
+      event_data:
+        action: tap
+  actions:
+    - choose:
+        - conditions:
+            - condition: state
+              entity_id: input_boolean.phone_call_active
+              state: "on"
+          sequence:
+            - action: notify.mobile_app_YOUR_PHONE
+              data:
+                message: command_broadcast_intent
+                data:
+                  intent_package_name: dev.mutemebridge.callcompanion
+                  intent_action: dev.mutemebridge.callcompanion.TOGGLE_MUTE
+      default:
+        - action: input_boolean.toggle
+          target:
+            entity_id: input_boolean.muteme_display_paused
+  mode: single
+
+# 3. In your MuteMe display automation (example 3 in automations-example.yaml),
+#    show the call state ahead of everything except quiet hours. Add this trigger:
+#
+#      - trigger: state
+#        entity_id: [input_boolean.phone_call_active, input_boolean.phone_call_muted]
+#
+#    and use this "look" template, so a call shows even while the light is paused:
+#
+#      look: >-
+#        {% if quiet %}
+#          {{ {'color': 'off', 'mode': 'solid'} }}
+#        {% elif is_state('input_boolean.phone_call_active', 'on') %}
+#          {{ {'color': 'red', 'mode': 'solid'} if is_state('input_boolean.phone_call_muted', 'on')
+#             else {'color': 'green', 'mode': 'solid'} }}
+#        {% elif is_state('input_boolean.muteme_display_paused', 'on') %}
+#          {{ {'color': 'off', 'mode': 'solid'} }}
+#        {% else %}
+#          {{ looks[alert] if alert in looks else looks['clear'] }}
+#        {% endif %}

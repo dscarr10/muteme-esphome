@@ -1,0 +1,78 @@
+# Example Home Assistant automations for the MuteMe bridge.
+# Entity IDs assume the ESPHome device is named "MuteMe" — adjust to match yours.
+# Needs a toggle helper: input_boolean.muteme_display_paused
+
+# 1. Tap the button to pause / resume its light
+- id: muteme_tap_pause_display
+  alias: MuteMe → tap to pause/resume light
+  triggers:
+    - trigger: event
+      event_type: esphome.muteme_button
+      event_data:
+        action: tap
+  actions:
+    - action: input_boolean.toggle
+      target:
+        entity_id: input_boolean.muteme_display_paused
+  mode: single
+
+# 2. Un-pause every morning when quiet hours end
+- id: muteme_unpause_morning
+  alias: MuteMe → unpause at 9 AM
+  triggers:
+    - trigger: time
+      at: "09:00:00"
+  conditions:
+    - condition: state
+      entity_id: input_boolean.muteme_display_paused
+      state: "on"
+  actions:
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.muteme_display_paused
+  mode: single
+
+# 3. Show a status on the button: one sensor's state → colour + mode.
+#    Replace sensor.home_alert and the "looks" map with your own states.
+#    Quiet hours 11:30 PM–9:00 AM and "paused" both turn the light off.
+#    Note: variables are evaluated in order, so "quiet" must come before "look".
+- id: muteme_status_display
+  alias: Status → MuteMe
+  triggers:
+    - trigger: state
+      entity_id: sensor.home_alert
+    - trigger: state
+      entity_id: input_boolean.muteme_display_paused
+    - trigger: state
+      entity_id: binary_sensor.muteme_button_connected
+      to: "on"
+    - trigger: time
+      at: ["09:00:00", "23:30:00"]
+    - trigger: homeassistant
+      event: start
+  actions:
+    - delay:
+        seconds: >-
+          {{ 5 if trigger.platform == 'homeassistant'
+             or (trigger.platform == 'state'
+                 and trigger.entity_id == 'binary_sensor.muteme_button_connected')
+             else 0 }}
+    - variables:
+        alert: "{{ states('sensor.home_alert') }}"
+        quiet: "{% set t = now().strftime('%H:%M') %}{{ t >= '23:30' or t < '09:00' }}"
+        looks:
+          urgent: { color: red, mode: fast_pulse }
+          problem: { color: red, mode: slow_pulse }
+          reminder: { color: yellow, mode: slow_pulse }
+          clear: { color: white, mode: dim }
+        look: >-
+          {% if quiet or is_state('input_boolean.muteme_display_paused', 'on') %}
+            {{ {'color': 'off', 'mode': 'solid'} }}
+          {% else %}
+            {{ looks[alert] if alert in looks else looks['clear'] }}
+          {% endif %}
+    - action: esphome.muteme_bridge_set_led
+      data:
+        color: "{{ look.color }}"
+        mode: "{{ look.mode }}"
+  mode: restart

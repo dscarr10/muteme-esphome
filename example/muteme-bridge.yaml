@@ -1,0 +1,227 @@
+substitutions:
+  name: muteme-bridge
+  friendly_name: MuteMe
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+external_components:
+  # Pull the component straight from GitHub:
+  - source: github://dscarr10/muteme-esphome@main
+    components: [muteme]
+  # Or, if you copied the components/ folder next to this file instead:
+  # - source:
+  #     type: local
+  #     path: components
+
+# Serial logging is off so the TX/RX LEDs stay dark. Logs still show in the
+# ESPHome dashboard over Wi-Fi. To get USB logs back for debugging, replace
+# "baud_rate: 0" with "hardware_uart: UART0" (never the native USB port —
+# that's the USB host for the MuteMe).
+logger:
+  baud_rate: 0
+
+api:
+  encryption:
+    key: !secret muteme_api_key
+  actions:
+    # Call from HA as esphome.muteme_bridge_set_led with color + mode
+    - action: set_led
+      variables:
+        color: string
+        mode: string
+      then:
+        - select.set:
+            id: led_mode
+            option: !lambda return mode;
+        - select.set:
+            id: led_color
+            option: !lambda return color;
+
+ota:
+  - platform: esphome
+    password: !secret muteme_ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+globals:
+  - id: led_color_g
+    type: std::string
+    restore_value: no
+    initial_value: '"off"'
+  - id: led_mode_g
+    type: std::string
+    restore_value: no
+    initial_value: '"solid"'
+  - id: effect_g
+    type: std::string
+    restore_value: no
+    initial_value: '"none"'
+  - id: effect_step
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+muteme:
+  id: muteme_dev
+  report_type: feature
+  # Set to true to log every report the button sends (useful for debugging).
+  log_raw_reports: false
+  on_touch_start:
+    - binary_sensor.template.publish:
+        id: touch
+        state: ON
+  on_touch_end:
+    - binary_sensor.template.publish:
+        id: touch
+        state: OFF
+
+binary_sensor:
+  - platform: template
+    id: touch
+    name: Touch
+    on_multi_click:
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at most 0.35s
+          - ON for at most 0.5s
+          - OFF for at least 0.2s
+        then:
+          - homeassistant.event:
+              event: esphome.muteme_button
+              data:
+                action: double_tap
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at least 0.35s
+        then:
+          - homeassistant.event:
+              event: esphome.muteme_button
+              data:
+                action: tap
+      - timing:
+          - ON for at least 1s
+        then:
+          - homeassistant.event:
+              event: esphome.muteme_button
+              data:
+                action: long_press
+
+  - platform: template
+    name: Button connected
+    device_class: connectivity
+    entity_category: diagnostic
+    lambda: return id(muteme_dev).is_connected();
+
+number:
+  - platform: template
+    id: effect_speed
+    name: Effect step time
+    optimistic: true
+    min_value: 0.2
+    max_value: 5
+    step: 0.1
+    initial_value: 1.0
+    unit_of_measurement: s
+    mode: box
+
+script:
+  - id: effect_loop
+    mode: restart
+    then:
+      - while:
+          condition:
+            lambda: return true;
+          then:
+            - lambda: |-
+                static const char *const RAINBOW[] = {"red", "yellow", "green", "cyan", "blue", "purple"};
+                static const char *const RED_BLUE[] = {"red", "blue"};
+                static const char *const TRAFFIC[] = {"green", "yellow", "red"};
+                const char *const *seq = RAINBOW;
+                int n = 6;
+                const char *mode = "solid";
+                const std::string &fx = id(effect_g);
+                if (fx == "rainbow_breathe") mode = "slow_pulse";
+                else if (fx == "red_blue") { seq = RED_BLUE; n = 2; }
+                else if (fx == "traffic_light") { seq = TRAFFIC; n = 3; }
+                id(muteme_dev).set_led(seq[id(effect_step) % n], mode);
+                id(effect_step)++;
+            - delay: !lambda return id(effect_speed).state * 1000;
+
+select:
+  - platform: template
+    id: led_color
+    name: LED colour
+    optimistic: true
+    options: ["off", "red", "green", "yellow", "blue", "purple", "cyan", "white"]
+    initial_option: "off"
+    set_action:
+      - lambda: |-
+          id(led_color_g) = x;
+          id(muteme_dev).set_led(id(led_color_g), id(led_mode_g));
+      - if:
+          condition:
+            lambda: 'return id(effect_g) != "none";'
+          then:
+            - script.stop: effect_loop
+            - select.set:
+                id: led_effect
+                option: "none"
+
+  - platform: template
+    id: led_mode
+    name: LED mode
+    optimistic: true
+    options: ["solid", "dim", "fast_pulse", "slow_pulse"]
+    initial_option: "solid"
+    set_action:
+      - lambda: |-
+          id(led_mode_g) = x;
+          id(muteme_dev).set_led(id(led_color_g), id(led_mode_g));
+      - if:
+          condition:
+            lambda: 'return id(effect_g) != "none";'
+          then:
+            - script.stop: effect_loop
+            - select.set:
+                id: led_effect
+                option: "none"
+
+  - platform: template
+    id: led_effect
+    name: LED effect
+    optimistic: true
+    options: ["none", "rainbow", "rainbow_breathe", "red_blue", "traffic_light"]
+    initial_option: "none"
+    set_action:
+      - lambda: |-
+          id(effect_g) = x;
+          id(effect_step) = 0;
+      - if:
+          condition:
+            lambda: 'return id(effect_g) == "none";'
+          then:
+            - script.stop: effect_loop
+            - lambda: id(muteme_dev).set_led(id(led_color_g), id(led_mode_g));
+          else:
+            - script.execute: effect_loop
+
+# Onboard RGB LED (GPIO48) — kept off at every boot. Hidden from Home Assistant.
+light:
+  - platform: esp32_rmt_led_strip
+    id: onboard_rgb
+    internal: true
+    pin: GPIO48
+    num_leds: 1
+    chipset: ws2812
+    channel_colors: GRB
+    restore_mode: ALWAYS_OFF
