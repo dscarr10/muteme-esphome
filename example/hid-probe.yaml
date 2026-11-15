@@ -1,0 +1,41 @@
+# HID probe add-on for exploring undocumented MuteMe commands (e.g. per-LED colour).
+# Experimental: lives on the hid-probe branch.
+#
+# 1. In your device YAML, point external_components at the branch:
+#
+#      external_components:
+#        - source: github://dscarr10/muteme-esphome@hid-probe
+#          components: [muteme]
+#          refresh: 0s
+#
+# 2. Paste the text and button below into the same file (they use id muteme_dev), install,
+#    and open the device's LOGS in ESPHome.
+# 3. Set "LED effect" to none and pause any automations that set the LED while you test.
+#
+# Commands (type into "HID probe command" in Home Assistant; hex bytes, spaces between them):
+#   descriptor                          log what the button says it accepts
+#   led 41                              send one raw LED byte (try mode nibbles 40-F0)
+#   set feature 01 02 03 04             SET_REPORT; the first byte is the report ID
+#   set output 00 01 02 03
+#   get feature 01 8                    GET_REPORT, ID 01, 8 bytes (length in decimal)
+#   write 01 02 03                      write to the interrupt OUT endpoint, if there is one
+#
+# If the button stops responding, unplug it and plug it back in.
+
+text:
+  - platform: template
+    name: "HID probe command"
+    id: hid_probe_cmd
+    mode: text
+    optimistic: true
+    max_length: 100
+    entity_category: config
+    on_value:
+      - lambda: id(muteme_dev).run_command(x);
+
+button:
+  - platform: template
+    name: "Log HID descriptor"
+    entity_category: diagnostic
+    on_press:
+      - lambda: id(muteme_dev).dump_descriptor();
