@@ -47,6 +47,28 @@ struct RawReport {
   uint8_t data[16];
 };
 
+// HID probe: a command typed in Home Assistant, carried from the main loop to the USB task.
+enum ProbeKind : uint8_t {
+  PROBE_SET = 1,    // HID SET_REPORT control transfer
+  PROBE_GET = 2,    // HID GET_REPORT control transfer
+  PROBE_WRITE = 3,  // write to the interrupt OUT endpoint
+};
+
+struct ProbeCmd {
+  uint8_t kind{0};
+  uint8_t report_type{0};  // 1 input, 2 output, 3 feature
+  uint8_t report_id{0};
+  uint16_t len{0};
+  uint8_t data[64]{};
+};
+
+// What the shared control transfer is currently doing.
+enum CtrlKind : uint8_t {
+  CTRL_LED = 0,
+  CTRL_DESC = 1,
+  CTRL_PROBE = 2,
+};
+
 class MuteMeComponent : public Component {
  public:
   void setup() override;
@@ -60,6 +82,15 @@ class MuteMeComponent : public Component {
 
   void set_feature_report(bool feature) { this->use_feature_report_ = feature; }
   void set_log_raw(bool log_raw) { this->log_raw_ = log_raw; }
+
+  // HID probe (for exploring undocumented commands). Call from the main loop, e.g. a template text's on_value.
+  //   descriptor                       log the HID report descriptor again
+  //   led <byte>                       send one raw LED byte, e.g. "led 0x41"
+  //   set <feature|output> <bytes...>  SET_REPORT; the first byte is the report ID and is also sent as data
+  //   get <feature|input|output> <id> <length>   GET_REPORT, logs the reply
+  //   write <bytes...>                 send bytes to the interrupt OUT endpoint (if the button has one)
+  void run_command(const std::string &command);
+  void dump_descriptor();
 
   bool is_connected() const { return this->connected_.load(); }
   bool is_touching() const { return this->touching_; }
@@ -75,11 +106,18 @@ class MuteMeComponent : public Component {
   static void client_event_cb_(const usb_host_client_event_msg_t *msg, void *arg);
   static void in_transfer_cb_(usb_transfer_t *transfer);
   static void ctrl_transfer_cb_(usb_transfer_t *transfer);
+  static void out_transfer_cb_(usb_transfer_t *transfer);
 
   // Run on the USB client task only.
   void open_device_(uint8_t address);
   void close_device_();
   void send_led_(uint8_t value);
+  void request_descriptor_();
+  void send_probe_();
+
+  // Main loop only.
+  void log_descriptor_();
+  void log_probe_result_();
 
   void handle_touch_byte_(uint8_t value);
   void start_touch_();
@@ -103,6 +141,28 @@ class MuteMeComponent : public Component {
   std::atomic<bool> ctrl_busy_{false};
   std::atomic<int> pending_open_addr_{-1};
   std::atomic<bool> closing_{false};
+  uint8_t mps0_{8};
+  uint16_t hid_desc_len_{0};
+  uint8_t ep_out_{0};
+  uint16_t ep_out_mps_{0};
+  usb_transfer_t *out_xfer_{nullptr};
+  std::atomic<bool> out_busy_{false};
+  std::atomic<bool> desc_pending_{false};
+  std::atomic<uint8_t> ctrl_kind_{CTRL_LED};
+
+  // HID probe: main loop -> USB task
+  ProbeCmd probe_cmd_;
+  std::atomic<bool> probe_pending_{false};
+
+  // HID probe: USB task -> main loop
+  uint8_t desc_buf_[512]{};
+  uint16_t desc_len_{0};
+  std::atomic<bool> desc_ready_{false};
+  uint8_t result_buf_[64]{};
+  uint16_t result_len_{0};
+  int result_status_{0};
+  uint8_t result_kind_{0};
+  std::atomic<bool> result_ready_{false};
 
   // Shared between tasks
   std::atomic<bool> connected_{false};
