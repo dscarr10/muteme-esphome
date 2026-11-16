@@ -8,7 +8,9 @@
 #       "Phone call muted"   → input_boolean.phone_call_muted
 #  2. Pick your own random webhook ID below and put the same URL in the phone app:
 #       https://<your-ha-address>/api/webhook/<webhook_id>
-#  3. Replace notify.mobile_app_YOUR_PHONE with your phone's notify action.
+#  3. Replace notify.mobile_app_YOUR_PHONE with your phone's notify action, and
+#     sensor.YOUR_PHONE_audio_mode with your phone's Audio mode sensor (HA companion app;
+#     enable it under the app's Settings → Companion app → Manage sensors if it's off).
 
 # 1. Phone app → Home Assistant: keep the helpers in sync with the call
 - id: call_companion_webhook
@@ -74,3 +76,42 @@
 #        {% else %}
 #          {{ looks[alert] if alert in looks else looks['clear'] }}
 #        {% endif %}
+
+# 4. Safety net: if the end of a call is missed (phone offline, app killed, HA restart),
+#    clear the call state so the MuteMe doesn't stay red. It cross-checks the HA companion
+#    app's Audio mode sensor, which reads in_communication during a call and normal after.
+- id: muteme_clear_stale_call
+  alias: MuteMe → clear stale call state
+  triggers:
+    - trigger: state
+      entity_id: sensor.YOUR_PHONE_audio_mode
+      to: normal
+      for:
+        minutes: 2
+      id: audio_normal
+    - trigger: homeassistant
+      event: start
+      id: ha_start
+    - trigger: state                             # backstop if the phone goes silent
+      entity_id: input_boolean.phone_call_active
+      to: "on"
+      for:
+        hours: 6
+      id: backstop
+  conditions:
+    - condition: state
+      entity_id: input_boolean.phone_call_active
+      state: "on"
+    - condition: template
+      value_template: "{{ trigger.id == 'backstop' or is_state('sensor.YOUR_PHONE_audio_mode', 'normal') }}"
+  actions:
+    - delay:
+        seconds: "{{ 60 if trigger.id == 'ha_start' else 0 }}"   # let the phone's sensors catch up
+    - condition: template
+      value_template: "{{ trigger.id == 'backstop' or is_state('sensor.YOUR_PHONE_audio_mode', 'normal') }}"
+    - action: input_boolean.turn_off
+      target:
+        entity_id:
+          - input_boolean.phone_call_active
+          - input_boolean.phone_call_muted
+  mode: single
